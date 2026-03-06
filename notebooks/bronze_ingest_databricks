@@ -1,0 +1,38 @@
+# Databricks Bronze Ingestion Notebook
+# Layer: Bronze (Raw → Delta)
+# Author: Vignesh Sundar
+
+from pyspark.sql import functions as F
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+# ---------------------------------------------
+# 1. Catalog and Schema
+# ---------------------------------------------
+spark.sql("USE CATALOG smart_home")
+spark.sql("USE SCHEMA bronze")
+
+print("Using smart_home.bronze")
+
+# ---------------------------------------------
+# 2. Input Path (JSON from simulator)
+# ---------------------------------------------
+raw_path = "dbfs:/mnt/iot/bronze_raw/"   # adjust if needed
+bronze_table = "smart_home.bronze.events"
+
+# ---------------------------------------------
+# 3. Read Raw JSON
+# ---------------------------------------------
+df_raw = (
+    spark.read.format("json")
+    .load(raw_path)
+    .withColumn("ingest_timestamp", F.current_timestamp())
+)
+
+# ---------------------------------------------
+# 4. Write to Delta Table
+# ---------------------------------------------
+df_raw.write.format("delta").mode("append").saveAsTable(bronze_table)
+
+print("Bronze ingestion complete.")

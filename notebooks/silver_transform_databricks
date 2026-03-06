@@ -1,0 +1,63 @@
+# Databricks Silver Transformation Notebook
+# Layer: Silver (Bronze → Clean)
+# Author: Vignesh Sundar
+
+from pyspark.sql import functions as F
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+# ---------------------------------------------
+# 1. Catalog and Schema
+# ---------------------------------------------
+spark.sql("USE CATALOG smart_home")
+spark.sql("USE SCHEMA silver")
+
+print("Using smart_home.silver")
+
+# ---------------------------------------------
+# 2. Load Bronze Table
+# ---------------------------------------------
+df_bronze = spark.table("smart_home.bronze.events")
+
+# ---------------------------------------------
+# 3. Motion Sensor Cleanup
+# ---------------------------------------------
+df_motion = (
+    df_bronze.filter(F.col("sensor_type") == "motion")
+    .withColumn("event_ts", F.to_timestamp("event_ts"))
+)
+
+df_motion.write.format("delta").mode("overwrite").saveAsTable("smart_home.silver.motion")
+
+# ---------------------------------------------
+# 4. Temperature & Humidity Cleanup
+# ---------------------------------------------
+df_temp = (
+    df_bronze.filter(F.col("sensor_type") == "temperature_humidity")
+    .withColumn("event_ts", F.to_timestamp("event_ts"))
+)
+
+df_temp.write.format("delta").mode("overwrite").saveAsTable("smart_home.silver.temperature_humidity")
+
+# ---------------------------------------------
+# 5. Smart Plug Cleanup
+# ---------------------------------------------
+df_plug = (
+    df_bronze.filter(F.col("sensor_type") == "smart_plug")
+    .withColumn("event_ts", F.to_timestamp("event_ts"))
+)
+
+df_plug.write.format("delta").mode("overwrite").saveAsTable("smart_home.silver.smart_plug")
+
+# ---------------------------------------------
+# 6. Smoke & CO Cleanup
+# ---------------------------------------------
+df_smoke = (
+    df_bronze.filter(F.col("sensor_type") == "smoke_co")
+    .withColumn("event_ts", F.to_timestamp("event_ts"))
+)
+
+df_smoke.write.format("delta").mode("overwrite").saveAsTable("smart_home.silver.smoke_co")
+
+print("Silver transformation complete.")

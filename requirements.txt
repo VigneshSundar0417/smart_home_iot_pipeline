@@ -1,0 +1,10 @@
+pandas==2.2.0
+pyarrow==15.0.0
+fastparquet==2024.2.0
+numpy==1.26.4
+python-dateutil==2.9.0
+pytz==2024.1
+
+# Databricks / Delta Lake
+delta-spark==3.1.0
+pyspark==3.5.0

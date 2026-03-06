@@ -1,0 +1,89 @@
+# Databricks Gold Aggregation Notebook
+# Layer: Gold (Silver → Analytics)
+# Author: Vignesh Sundar
+
+from pyspark.sql import functions as F
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.getOrCreate()
+
+# ---------------------------------------------
+# 1. Catalog and Schema
+# ---------------------------------------------
+spark.sql("USE CATALOG smart_home")
+spark.sql("USE SCHEMA gold")
+
+print("Using smart_home.gold")
+
+# ---------------------------------------------
+# 2. Load Silver Tables
+# ---------------------------------------------
+motion = spark.table("smart_home.silver.motion")
+temp = spark.table("smart_home.silver.temperature_humidity")
+plug = spark.table("smart_home.silver.smart_plug")
+smoke = spark.table("smart_home.silver.smoke_co")
+
+# ---------------------------------------------
+# 3. Motion Aggregation
+# ---------------------------------------------
+motion_gold = (
+    motion.withColumn("event_hour", F.date_trunc("hour", "event_ts"))
+    .groupBy("room", "event_hour")
+    .agg(
+        F.sum("motion_detected").alias("motion_count"),
+        F.avg("confidence").alias("avg_confidence"),
+        F.max("event_ts").alias("last_event_ts")
+    )
+)
+
+motion_gold.write.format("delta").mode("overwrite").saveAsTable("smart_home.gold.motion")
+
+# ---------------------------------------------
+# 4. Temperature & Humidity Aggregation
+# ---------------------------------------------
+temp_gold = (
+    temp.withColumn("event_hour", F.date_trunc("hour", "event_ts"))
+    .groupBy("room", "event_hour")
+    .agg(
+        F.avg("temperature_c").alias("avg_temp"),
+        F.min("temperature_c").alias("min_temp"),
+        F.max("temperature_c").alias("max_temp"),
+        F.avg("humidity_percent").alias("avg_humidity"),
+        F.min("humidity_percent").alias("min_humidity"),
+        F.max("humidity_percent").alias("max_humidity")
+    )
+)
+
+temp_gold.write.format("delta").mode("overwrite").saveAsTable("smart_home.gold.temperature_humidity")
+
+# ---------------------------------------------
+# 5. Smart Plug Aggregation
+# ---------------------------------------------
+plug_gold = (
+    plug.withColumn("event_hour", F.date_trunc("hour", "event_ts"))
+    .groupBy("room", "event_hour")
+    .agg(
+        F.sum("watt_hours").alias("total_watt_hours"),
+        F.avg("voltage").alias("avg_voltage"),
+        F.avg("current_amps").alias("avg_current")
+    )
+)
+
+plug_gold.write.format("delta").mode("overwrite").saveAsTable("smart_home.gold.smart_plug")
+
+# ---------------------------------------------
+# 6. Smoke & CO Aggregation
+# ---------------------------------------------
+smoke_gold = (
+    smoke.withColumn("event_hour", F.date_trunc("hour", "event_ts"))
+    .groupBy("room", "event_hour")
+    .agg(
+        F.avg("smoke_level").alias("avg_smoke_level"),
+        F.avg("co_level").alias("avg_co_level"),
+        F.min("battery_level").alias("min_battery_level")
+    )
+)
+
+smoke_gold.write.format("delta").mode("overwrite").saveAsTable("smart_home.gold.smoke_co")
+
+print("Gold aggregation complete.")
